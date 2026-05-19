@@ -9,11 +9,8 @@ export default function Home() {
       {/* BAŞLIK, ARAMA MOTORU (SEO) VE GOOGLE DOĞRULAMA ETİKETLERİ */}
       <head>
         <title>Alfa Garaj | Gebze Elektrikli Scooter Tamir & Teknik Servis</title>
-        
-        {/* Senin gönderdiğin gerçek Google doğrulama kodu tam buraya işlendi */}
         <meta name="google-site-verification" content="Qqxue1O21lq5cLP1zjNuTYvM-qmHE-t66P9Bq0bgkvQ" />
-        
-        <meta name="description" content="Gebze Onvo, Segway, Citycoco yetkili teknik servisi. Elektrikli scooter, scuter, sukuter tamiri, batarya onarımı, BMS ve dolgu lastik değişimi." />
+        <meta name="description" content="Gebze Onvo, Segway, Citycoco yetkili teknik servisi. Elektrikli scooter, scuter, sukuter tamiri, batarya onarımı, BMS ogolgu lastik değişimi." />
         <meta name="keywords" content="gebze scooter tamiri, gebze scuter servisi, gebze sukuter tamircisi, onvo servis gebze, segway tamir, citycoco batarya" />
       </head>
 
@@ -21,7 +18,6 @@ export default function Home() {
       <nav className="border-b border-white/10 bg-black/90 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
           <div className="flex items-center">
-            {/* Logonun orijinal renklerini koruyan kurumsal beyaz kutu */}
             <div className="bg-white px-3 py-1.5 rounded-lg flex items-center justify-center shadow-md">
               <img 
                 src="/logo.png" 
@@ -42,7 +38,6 @@ export default function Home() {
       <header className="relative py-20 md:py-28 flex flex-col items-center justify-center text-center px-6 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.12)_0%,transparent_60%)] pointer-events-none" />
         
-        {/* Ortadaki Büyük Logo Alanı */}
         <div className="mb-10 bg-white p-6 rounded-2xl shadow-2xl border border-white/20 max-w-xs md:max-w-sm flex items-center justify-center">
           <img 
             src="/logo.png" 
@@ -148,8 +143,8 @@ export default function Home() {
             <p className="text-neutral-400 text-sm mt-4">Pazartesi - Cumartesi: 09:00 - 19:00</p>
           </div>
 
-          {/* HATALARI YAKALAYACAK GİZLİ SEO ETİKETLERİ BANT ALANI */}
-          <div className="mt-16 pt-8 border-t border-white/5 text-[10px] text-neutral-600 flex flex-wrap justify-center gap-4">
+          {/* 'sr-only' sınıfı sayesinde bu alan tamamen gizlendi, sadece Google botları okuyabilir */}
+          <div className="sr-only">
             <span>Gebze Scooter Tamiri</span> • <span>Gebze Scuter Servisi</span> • <span>Gebze Sukuter Onarımı</span> • <span>Onvo Servis Gebze</span> • <span>Segway Servis Kocaeli</span> • <span>Citycoco Tamir Merkezî</span>
           </div>
         </div>
