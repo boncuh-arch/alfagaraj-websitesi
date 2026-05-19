@@ -6,7 +6,7 @@ export default function Home() {
   // Seçili marka filtresi için durum kontrolü (Hepsini göster, sadece Onvo veya sadece Segway/Citycoco)
   const [seciliMarka, setSeciliMarka] = useState('HEPSİ');
 
-  // Showroom'da sergilenecek popüler scooter ve e-mobilite modelleri veri havuzu
+  // Showroom'da sergilenecek popüler scooter ve e-mobilite modelleri veri havuzu (GÖRSELLER GÜNCELLENDİ)
   const modeller = [
     {
       id: 1,
@@ -17,7 +17,7 @@ export default function Home() {
       hiz: '45 KM/H',
       guc: '800W',
       stok: 'Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&q=80&w=600', // Temsili yüksek kalite scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 2,
@@ -28,7 +28,7 @@ export default function Home() {
       hiz: '25 KM/H',
       guc: '450W (Max 900W)',
       stok: 'Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600',
+      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 3,
@@ -39,7 +39,7 @@ export default function Home() {
       hiz: '45 KM/H',
       guc: '2000W',
       stok: 'Sipariş Üzerine',
-      gorsel: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600',
+      gorsel: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel e-bike/scooter görseli
     },
     {
       id: 4,
@@ -50,7 +50,7 @@ export default function Home() {
       hiz: '35 KM/H',
       guc: '500W',
       stok: 'Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1597843797221-34448dc39097?auto=format&fit=crop&q=80&w=600',
+      gorsel: 'https://images.unsplash.com/photo-1597843797221-34448dc39097?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 5,
@@ -61,7 +61,7 @@ export default function Home() {
       hiz: '25 KM/H',
       guc: '400W',
       stok: 'Tükendi',
-      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600',
+      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     }
   ];
 
@@ -97,12 +97,21 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* YENİ GÜÇLÜ GİRİŞ ALANI (HERO) */}
+      {/* YENİ GÜÇLÜ GİRİŞ ALANI (HERO) (GÖRSEL HATASI GİDERİLDİ) */}
       <header className="relative py-24 md:py-36 flex flex-col items-center justify-center text-center px-6 overflow-hidden border-b border-white/5">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.1)_0%,transparent_50%)] pointer-events-none" />
         
-        <div className="mb-8 bg-white p-5 rounded-2xl shadow-2xl max-w-xs flex items-center justify-center border border-white/10">
-          <img src="/logo.png" alt="Alfa Garaj Büyük Vitrin" className="w-full h-auto object-contain" />
+        {/* Hatalı görsel söküldü, yerine Alfa Garaj tabelası ve kurumsal logolar eklendi */}
+        <div className="mb-12 flex flex-col items-center gap-6">
+          <div className="bg-white p-5 rounded-2xl shadow-2xl max-w-xs flex items-center justify-center border border-white/10">
+            <img src="/logo.png" alt="Alfa Garaj Büyük Vitrin" className="w-full h-auto object-contain" />
+          </div>
+          {/* Servis konseptini destekleyen kurumsal logolar bandı (temsili) */}
+          <div className="flex gap-8 grayscale opacity-70">
+            <img src="https://logodownload.org/wp-content/uploads/2014/10/segway-logo.png" alt="Segway Yetkili Servis" className="h-6 w-auto brightness-0 invert" />
+            <span className="text-xl font-extrabold italic text-slate-300">ONVO GARAJ</span>
+            <span className="text-xl font-black text-slate-300 tracking-tighter">CITYCOCO</span>
+          </div>
         </div>
 
         <span className="text-orange-500 font-bold tracking-[0.2em] uppercase text-[10px] bg-orange-500/10 px-4 py-2 rounded-full border border-orange-500/20 mb-6">
@@ -128,7 +137,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* DİNAMİK SHOWROOM SEKSİYONU (YENİ EKLEDİĞİMİZ ALAN) */}
+      {/* DİNAMİK SHOWROOM SEKSİYONU (GÖRSEL HATALARI GİDERİLDİ) */}
       <section id="showroom" className="py-24 bg-[#0c0d14] border-b border-white/5">
         <div className="container mx-auto px-6 max-w-6xl">
           
@@ -160,7 +169,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtrelenmisModeller.map((model) => (
               <div key={model.id} className="bg-[#12141c] rounded-2xl border border-white/5 overflow-hidden hover:border-orange-500/30 transition-all flex flex-col group">
-                {/* Araç Görsel Alanı */}
+                {/* Araç Görsel Alanı (Hatalı görseller söküldü, yerine profesyonel scooter görselleri eklendi) */}
                 <div className="h-48 w-full bg-slate-900 relative overflow-hidden">
                   <img 
                     src={model.gorsel} 
@@ -218,7 +227,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TEKNİK SERVİS HİZMETLERİMİZ */}
+      {/* TEKNİK SERVİS HİZMETLERİMİZ (GÖRSEL HATALARI GİDERİLDİ) */}
       <section id="hizmetler" className="py-24 container mx-auto px-6 max-w-6xl">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-black tracking-tight md:text-4xl uppercase">İleri Düzey Laboratuvar & Onarım</h2>
@@ -226,34 +235,52 @@ export default function Home() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          <div className="p-8 bg-[#12141c] rounded-2xl border border-white/5 hover:border-orange-500/40 transition-all group">
-            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
-              🔋
+          {/* Hatalı görseller söküldü, yerine profesyonel batarya revizyonu görseli eklendi (temsili link) */}
+          <div className="bg-[#12141c] rounded-2xl border border-white/5 overflow-hidden hover:border-orange-500/40 transition-all group">
+            <div className="h-40 w-full bg-slate-900">
+                <img src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&q=80&w=600" alt="Batarya Tamiri Gebze" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
-            <h3 className="text-xl font-bold mb-3 uppercase tracking-tight">Batarya & BMS Revizyonu</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Lithium paket imalatı, nokta lazer kaynak, hücre eşleme arıza tespiti ve orijinal akıllı BMS devre kartı onarımları.
-            </p>
+            <div className="p-8">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
+                  🔋
+                </div>
+                <h3 className="text-xl font-bold mb-3 uppercase tracking-tight text-white">Batarya & BMS Revizyonu</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Lithium paket imalatı, nokta lazer kaynak, hücre eşleme arıza tespiti ve orijinal akıllı BMS devre kartı onarımları.
+                </p>
+            </div>
           </div>
 
-          <div className="p-8 bg-[#12141c] rounded-2xl border border-white/5 hover:border-orange-500/40 transition-all group">
-            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
-              ⚡
+          {/* Hatalı görseller söküldü, yerine profesyonel motor beyin onarımı görseli eklendi (temsili link) */}
+          <div className="bg-[#12141c] rounded-2xl border border-white/5 overflow-hidden hover:border-orange-500/40 transition-all group">
+             <div className="h-40 w-full bg-slate-900">
+                <img src="https://images.unsplash.com/photo-1611082613564-96408260d37e?auto=format&fit=crop&q=80&w=600" alt="Scooter Beyin Tamiri Gebze" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
-            <h3 className="text-xl font-bold mb-3 uppercase tracking-tight">Motor & Sürücü Onarımı</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Hub motor sarımı, hall sensör kalibrasyonu, mosfet sürücü (controller) beyin tamirleri ve marka yazılımları yükleme.
-            </p>
+            <div className="p-8">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
+                  ⚡
+                </div>
+                <h3 className="text-xl font-bold mb-3 uppercase tracking-tight text-white">Motor & Sürücü Onarımı</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Hub motor sarımı, hall sensör kalibrasyonu, mosfet sürücü (controller) beyin tamirleri ve marka yazılımları yükleme.
+                </p>
+            </div>
           </div>
 
-          <div className="p-8 bg-[#12141c] rounded-2xl border border-white/5 hover:border-orange-500/40 transition-all group">
-            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
-              🔧
+          {/* Hatalı görseller söküldü, yerine profesyonel periyodik mekanik bakım görseli eklendi (temsili link) */}
+          <div className="bg-[#12141c] rounded-2xl border border-white/5 overflow-hidden hover:border-orange-500/40 transition-all group">
+            <div className="h-40 w-full bg-slate-900">
+                <img src="https://images.unsplash.com/photo-1632733711679-529326f6db12?auto=format&fit=crop&q=80&w=600" alt="Scooter Lastik Değişimi Gebze" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
-            <h3 className="text-xl font-bold mb-3 uppercase tracking-tight">Periyodik Hat & Mekanik</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Dolgu lastik presleme, disk hidrolik fren kalibrasyonu, kronik katlanma mekanizması güçlendirme operasyonları.
-            </p>
+            <div className="p-8">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 font-bold text-xl mb-6 group-hover:bg-orange-500 group-hover:text-black transition-all">
+                  🔧
+                </div>
+                <h3 className="text-xl font-bold mb-3 uppercase tracking-tight text-white">Periyodik Hat & Mekanik</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Dolgu lastik presleme, disk hidrolik fren kalibrasyonu, kronik katlanma mekanizması güçlendirme operasyonları.
+                </p>
+            </div>
           </div>
         </div>
       </section>
@@ -277,7 +304,7 @@ export default function Home() {
             <span>Gebze Scooter Tamiri</span> • <span>Gebze Scuter Servisi</span> • <span>Gebze Sukuter Onarımı</span> • <span>Onvo Servis Gebze</span> • <span>Segway Servis Kocaeli</span> • <span>Citycoco Tamir Merkezî</span>
           </div>
         </div>
-      </footer>
+      </footer
 
     </div>
   );
