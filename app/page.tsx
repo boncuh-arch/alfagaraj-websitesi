@@ -74,13 +74,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-100 font-sans selection:bg-orange-500 selection:text-black">
       
-      {/* GÖRÜNMEZ SEO VE DOĞRULAMA ALANI */}
-      <head>
-        <title>Alfa Garaj | Gebze Elektrikli Scooter Showroom & Yetkili Servis</title>
-        <meta name="google-site-verification" content="Qqxue1O21lq5cLP1zjNuTYvM-qmHE-t66P9Bq0bgkvQ" />
-        <meta name="description" content="Gebze Onvo, Segway ve Citycoco elektrikli araç modelleri, sıfır ve ikinci el stok durumu, profesyonel teknik servis ve batarya onarımı." />
-      </head>
-
       {/* NAVBAR / ÜST MENÜ */}
       <nav className="border-b border-white/5 bg-[#090a0f]/90 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
