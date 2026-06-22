@@ -18,7 +18,7 @@ export default function Home() {
       hiz: '45 KM/H',
       guc: '800W',
       stok: 'Dükkanda Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1593955856417-66a8775f0a0c?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 2,
@@ -29,7 +29,7 @@ export default function Home() {
       hiz: '25 KM/H',
       guc: '450W (Max 900W)',
       stok: 'Dükkanda Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1598514982205-f36b96d1ea8d?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 3,
@@ -40,7 +40,7 @@ export default function Home() {
       hiz: '45 KM/H',
       guc: '2000W',
       stok: 'Sipariş Üzerine',
-      gorsel: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel e-bike/scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1620802051782-725ce781b0f5?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel e-bike/scooter görseli
     },
     {
       id: 4,
@@ -51,7 +51,7 @@ export default function Home() {
       hiz: '35 KM/H',
       guc: '500W',
       stok: 'Tükendi',
-      gorsel: 'https://images.unsplash.com/photo-1597843797221-34448dc39097?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1592837330089-10e30953c8ec?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     },
     {
       id: 5,
@@ -62,7 +62,7 @@ export default function Home() {
       hiz: '25 KM/H',
       guc: '400W',
       stok: 'Dükkanda Mevcut',
-      gorsel: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
+      gorsel: 'https://images.unsplash.com/photo-1593955856417-66a8775f0a0c?auto=format&fit=crop&q=80&w=600', // Yüksek kaliteli profesyonel scooter görseli
     }
   ];
 
