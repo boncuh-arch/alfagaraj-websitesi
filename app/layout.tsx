@@ -19,6 +19,21 @@ export const metadata: Metadata = {
   verification: {
     google: "Qqxue1O21lq5cLP1zjNuTYvM-qmHE-t66P9Bq0bgkvQ",
   },
+  openGraph: {
+    title: "Alfa Garaj | Gebze Elektrikli Scooter Tamiri & Yetkili Servis",
+    description: "Gebze'de Onvo, Segway ve Citycoco marka elektrikli scooter tamiri, batarya onarımı, lastik değişimi ve sıfır/ikinci el satışı yapan yetkili servis.",
+    url: "https://alfagaraj-websitesi.vercel.app",
+    siteName: "Alfa Garaj",
+    images: [
+      {
+        url: "https://alfagaraj-websitesi.vercel.app/logo.png",
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: "tr_TR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

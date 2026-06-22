@@ -74,6 +74,48 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-100 font-sans selection:bg-orange-500 selection:text-black">
       
+      {/* JSON-LD LocalBusiness Schema for Google */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "AutoRepair",
+            "name": "Alfa Garaj",
+            "image": "https://alfagaraj-websitesi.vercel.app/logo.png",
+            "@id": "https://alfagaraj-websitesi.vercel.app",
+            "url": "https://alfagaraj-websitesi.vercel.app",
+            "telephone": "+905321352815",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Hacı Halil Mah. Adliye Cad. No:33 (Adliye Yanı)",
+              "addressLocality": "Gebze",
+              "addressRegion": "Kocaeli",
+              "postalCode": "41400",
+              "addressCountry": "TR"
+            },
+            "geo": {
+              "@type": "GeoCoordinates",
+              "latitude": 40.8021,
+              "longitude": 29.4307
+            },
+            "openingHoursSpecification": {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday"
+              ],
+              "opens": "09:00",
+              "closes": "19:00"
+            },
+            "priceRange": "$$"
+          })
+        }}
+      />
       {/* NAVBAR / ÜST MENÜ */}
       <nav className="border-b border-white/5 bg-[#090a0f]/90 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
@@ -247,6 +289,31 @@ export default function Home() {
             <p className="text-slate-400 text-sm leading-relaxed">
               Onvo ve Segway dolgu lastik veya şambrel değişimi, hidrolik/mekanik fren sistemleri ayarı, amortisör bakımı ve güvenli sürüş testleri.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* SSS VE BÖLGELER (SEO İÇİN) */}
+      <section className="py-24 bg-[#090a0f] border-t border-white/5">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black tracking-tight uppercase text-white">Sıkça Sorulan Sorular & Hizmet Bölgelerimiz</h2>
+            <p className="text-slate-400 mt-2 text-sm">Aklınıza takılan sorular ve Gebze çevresindeki hizmet ağımız</p>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-[#12141c] p-6 rounded-2xl border border-white/5">
+              <h3 className="text-lg font-bold text-orange-500 uppercase mb-2">Hangi markaların tamirini yapıyorsunuz?</h3>
+              <p className="text-slate-400 text-sm">Başta Onvo, Segway ve Citycoco olmak üzere, Xiaomi, Kugoo ve diğer tüm bilinen elektrikli scooter ve motor markalarının yetkili seviyesinde bakım, batarya onarımı ve mekanik tamirini Gebze'deki servisimizde yapıyoruz.</p>
+            </div>
+            <div className="bg-[#12141c] p-6 rounded-2xl border border-white/5">
+              <h3 className="text-lg font-bold text-orange-500 uppercase mb-2">Sadece Gebze'ye mi hizmet veriyorsunuz?</h3>
+              <p className="text-slate-400 text-sm">Merkezimiz Gebze'de olmasına rağmen; Darıca, Çayırova, Dilovası, Tuzla ve Pendik gibi çevre bölgelerden gelen müşterilerimize de profesyonel elektrikli araç servis ve satış hizmeti sunuyoruz.</p>
+            </div>
+            <div className="bg-[#12141c] p-6 rounded-2xl border border-white/5">
+              <h3 className="text-lg font-bold text-orange-500 uppercase mb-2">Batarya tamiri yapıyor musunuz?</h3>
+              <p className="text-slate-400 text-sm">Evet, lityum batarya hücre değişimi, BMS kart onarımı, kapasite artırımı ve sıvı teması onarımları laboratuvar ortamında hassas bir şekilde yapılmaktadır.</p>
+            </div>
           </div>
         </div>
       </section>
