@@ -5,6 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
+      disallow: ['/yonetim', '/api/'],
     },
     sitemap: 'https://alfagaraj-websitesi.vercel.app/sitemap.xml',
   };
