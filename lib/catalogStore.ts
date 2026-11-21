@@ -7,8 +7,8 @@ const LOCAL_FILE = path.join(process.cwd(), 'data', 'catalog.json');
 const BLOB_API_BASE = 'https://blob.vercel-storage.com';
 const BLOB_CATALOG_KEY = 'alfa-garaj/catalog.json';
 
-// Sunucu içi sıcak önbellek (Vercel serverless soğuk başlangıçlarına kadar anlık yanıt sağlar)
 let memoryCache: CatalogData | null = null;
+let cachedBlobUrl: string | null = null;
 
 export type StorageBackendInfo = {
   mode: 'vercel-blob' | 'local-file' | 'ephemeral-memory';
@@ -16,12 +16,29 @@ export type StorageBackendInfo = {
   label: string;
 };
 
+function resolvePublicStoreBaseUrl(): string | null {
+  // 1. BLOB_STORE_ID varsa (örn: store_abcd1234 -> abcd1234)
+  const rawStoreId = process.env.BLOB_STORE_ID || '';
+  if (rawStoreId.startsWith('store_')) {
+    const id = rawStoreId.replace(/^store_/, '').toLowerCase();
+    if (id) return `https://${id}.public.blob.vercel-storage.com`;
+  }
+  // 2. BLOB_READ_WRITE_TOKEN içinden çıkar (vercel_blob_rw_<storeId>_<secret>)
+  const token = process.env.BLOB_READ_WRITE_TOKEN || '';
+  const parts = token.split('_');
+  if (parts.length >= 4 && parts[0] === 'vercel' && parts[1] === 'blob') {
+    const id = parts[3]?.toLowerCase();
+    if (id) return `https://${id}.public.blob.vercel-storage.com`;
+  }
+  return null;
+}
+
 export function getStorageInfo(): StorageBackendInfo {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     return {
       mode: 'vercel-blob',
       persistentInCloud: true,
-      label: 'Vercel Blob Bulut Depolama Aktif (Kalıcı)',
+      label: 'Vercel Blob Bulut Depolama Aktif (Ücretsiz Hobby Katmanı • Kalıcı)',
     };
   }
   if (process.env.VERCEL !== '1') {
@@ -40,6 +57,21 @@ export function getStorageInfo(): StorageBackendInfo {
 
 async function readFromVercelBlob(token: string): Promise<CatalogData | null> {
   try {
+    // Önce kota harcamayan doğrudan CDN URL'sini dene (0 Advanced Operation!)
+    const baseUrl = resolvePublicStoreBaseUrl();
+    const directUrl = cachedBlobUrl || (baseUrl ? `${baseUrl}/${BLOB_CATALOG_KEY}` : null);
+
+    if (directUrl) {
+      const directRes = await fetch(`${directUrl}?v=${Date.now()}`, { cache: 'no-store' });
+      if (directRes.ok) {
+        return (await directRes.json()) as CatalogData;
+      }
+      if (directRes.status === 404) {
+        return null; // Henüz ilk kayıt atılmamış, varsayılan katalog kullanılacak
+      }
+    }
+
+    // Yalnızca doğrudan URL çözülemediyse tek seferlik list() fallback
     const listRes = await fetch(
       `${BLOB_API_BASE}?prefix=${encodeURIComponent(BLOB_CATALOG_KEY)}&limit=5`,
       {
@@ -56,7 +88,8 @@ async function readFromVercelBlob(token: string): Promise<CatalogData | null> {
     const exact = blobs.find((b) => b.pathname === BLOB_CATALOG_KEY) || blobs[0];
     if (!exact?.url) return null;
 
-    const dataRes = await fetch(`${exact.url}?t=${Date.now()}`, { cache: 'no-store' });
+    cachedBlobUrl = exact.url;
+    const dataRes = await fetch(`${exact.url}?v=${Date.now()}`, { cache: 'no-store' });
     if (!dataRes.ok) return null;
     return (await dataRes.json()) as CatalogData;
   } catch {
@@ -74,11 +107,17 @@ async function writeToVercelBlob(token: string, data: CatalogData): Promise<bool
         'x-api-version': '7',
         'x-content-type': 'application/json',
         'x-add-random-suffix': '0',
+        'x-allow-overwrite': '1',
         'x-cache-control-max-age': '0',
       },
       body,
     });
-    return putRes.ok;
+    if (putRes.ok) {
+      const json = await putRes.json().catch(() => null);
+      if (json?.url) cachedBlobUrl = json.url;
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -92,7 +131,6 @@ export async function uploadImageAsset(
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
-  // 1. Vercel Blob bağlıysa doğrudan CDN'e yükle
   if (blobToken) {
     const key = `alfa-garaj/images/${Date.now()}-${safeName}`;
     const res = await fetch(`${BLOB_API_BASE}/${key}`, {
@@ -111,7 +149,6 @@ export async function uploadImageAsset(
     }
   }
 
-  // 2. Yerel geliştirme ortamındaysa public/uploads klasörüne kaydet
   if (process.env.VERCEL !== '1') {
     try {
       const uploadDir = path.join(process.cwd(), 'public', 'uploads');
@@ -120,11 +157,10 @@ export async function uploadImageAsset(
       await fs.writeFile(path.join(uploadDir, finalFile), buffer);
       return `/uploads/${finalFile}`;
     } catch {
-      // Yazılamazsa data URI fallback'e geç
+      // Fallback
     }
   }
 
-  // 3. Fallback: İstemcide sıkıştırılmış görseli doğrudan veri URL'si olarak döndür
   return `data:${mimeType || 'image/webp'};base64,${buffer.toString('base64')}`;
 }
 
