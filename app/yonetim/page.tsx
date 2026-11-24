@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   BrandName,
   CatalogData,
+  getScooterImages,
   ScooterCondition,
   ScooterItem,
   SparePartItem,
@@ -12,7 +13,11 @@ import {
 
 type AdminTab = 'scooters' | 'parts' | 'settings';
 
-async function compressImageClient(file: File, maxWidth = 960): Promise<Blob> {
+function isPlaceholderSvg(url?: string): boolean {
+  return Boolean(url && url.startsWith('/products/') && url.endsWith('.svg'));
+}
+
+async function compressImageClient(file: File, maxWidth = 1080): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -36,7 +41,7 @@ async function compressImageClient(file: File, maxWidth = 960): Promise<Blob> {
           else resolve(file);
         },
         'image/webp',
-        0.84
+        0.85
       );
     };
     img.onerror = (err) => {
@@ -45,6 +50,18 @@ async function compressImageClient(file: File, maxWidth = 960): Promise<Blob> {
     };
     img.src = objectUrl;
   });
+}
+
+async function uploadSingleFile(file: File, prefixId: string): Promise<string> {
+  const compressed = await compressImageClient(file);
+  const fd = new FormData();
+  fd.append('file', compressed, `${prefixId}-${Date.now()}.webp`);
+  const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (!res.ok || !data?.url) {
+    throw new Error(data?.error || 'Görsel yüklenemedi.');
+  }
+  return data.url as string;
 }
 
 export default function AdminYonetimPage() {
@@ -135,38 +152,106 @@ export default function AdminYonetimPage() {
     }
   }
 
-  async function handleFileSelect(
-    file: File | undefined,
-    kind: 'scooter' | 'part',
-    id: string
+  // Scooter için belirli bir yuvaya (0, 1, 2...) veya toplu çoklu fotoğraf ekleme
+  async function handleScooterImagesUpload(
+    files: FileList | null,
+    scooterId: string,
+    replaceSlotIndex?: number
   ) {
-    if (!file || !catalog) return;
-    setUploadingId(id);
+    if (!files || files.length === 0 || !catalog) return;
+    const target = catalog.scooters.find((s) => s.id === scooterId);
+    if (!target) return;
+
+    setUploadingId(scooterId);
     try {
-      const compressed = await compressImageClient(file);
-      const fd = new FormData();
-      fd.append('file', compressed, `${id}.webp`);
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok || !data?.url) {
-        notify(data?.error || 'Görsel yüklenemedi.');
-        return;
+      const uploadedUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const url = await uploadSingleFile(file, scooterId);
+        uploadedUrls.push(url);
       }
 
-      const nextCatalog: CatalogData =
-        kind === 'scooter'
-          ? {
-              ...catalog,
-              scooters: catalog.scooters.map((s) => (s.id === id ? { ...s, img: data.url } : s)),
-            }
-          : {
-              ...catalog,
-              parts: catalog.parts.map((p) => (p.id === id ? { ...p, img: data.url } : p)),
-            };
+      const existingRaw = getScooterImages(target);
+      // Eğer mevcut tek görsel varsayılan çizim SVG ise gerçek fotoğraflarla başlat
+      const currentReal =
+        existingRaw.length === 1 && isPlaceholderSvg(existingRaw[0]) ? [] : [...existingRaw];
 
-      await persistCatalog(nextCatalog, 'Görsel yüklendi ve kaydedildi.');
-    } catch {
-      notify('Görsel işlenirken bir hata oluştu.');
+      let nextImages: string[];
+      if (typeof replaceSlotIndex === 'number' && uploadedUrls.length === 1) {
+        nextImages = [...currentReal];
+        if (replaceSlotIndex < nextImages.length) {
+          nextImages[replaceSlotIndex] = uploadedUrls[0];
+        } else {
+          nextImages.push(uploadedUrls[0]);
+        }
+      } else {
+        nextImages = [...currentReal, ...uploadedUrls];
+      }
+
+      const cover = nextImages[0] || '/products/segway-scooter.svg';
+      const nextCatalog: CatalogData = {
+        ...catalog,
+        scooters: catalog.scooters.map((s) =>
+          s.id === scooterId ? { ...s, img: cover, images: nextImages } : s
+        ),
+      };
+
+      await persistCatalog(
+        nextCatalog,
+        `${uploadedUrls.length} adet fotoğraf yüklendi ve kaydedildi.`
+      );
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Görsel yüklenirken hata oluştu.');
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  function removeScooterImage(scooterId: string, idx: number) {
+    if (!catalog) return;
+    const target = catalog.scooters.find((s) => s.id === scooterId);
+    if (!target) return;
+    const imgs = getScooterImages(target).filter((_, i) => i !== idx);
+    const fallback = target.brand === 'ONVO' ? '/products/onvo-scooter.svg' : '/products/segway-scooter.svg';
+    const nextImages = imgs.length > 0 ? imgs : [fallback];
+    const nextCatalog: CatalogData = {
+      ...catalog,
+      scooters: catalog.scooters.map((s) =>
+        s.id === scooterId ? { ...s, img: nextImages[0], images: imgs } : s
+      ),
+    };
+    persistCatalog(nextCatalog, 'Fotoğraf kaldırıldı.');
+  }
+
+  function makeCoverImage(scooterId: string, idx: number) {
+    if (!catalog || idx === 0) return;
+    const target = catalog.scooters.find((s) => s.id === scooterId);
+    if (!target) return;
+    const imgs = [...getScooterImages(target)];
+    const [picked] = imgs.splice(idx, 1);
+    if (!picked) return;
+    imgs.unshift(picked);
+    const nextCatalog: CatalogData = {
+      ...catalog,
+      scooters: catalog.scooters.map((s) =>
+        s.id === scooterId ? { ...s, img: imgs[0], images: imgs } : s
+      ),
+    };
+    persistCatalog(nextCatalog, 'Kapak fotoğrafı güncellendi.');
+  }
+
+  // Yedek parça için tek fotoğraf yükleme
+  async function handlePartImageUpload(file: File | undefined, partId: string) {
+    if (!file || !catalog) return;
+    setUploadingId(partId);
+    try {
+      const url = await uploadSingleFile(file, partId);
+      const nextCatalog: CatalogData = {
+        ...catalog,
+        parts: catalog.parts.map((p) => (p.id === partId ? { ...p, img: url } : p)),
+      };
+      await persistCatalog(nextCatalog, 'Parça görseli yüklendi ve kaydedildi.');
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Görsel yüklenirken hata oluştu.');
     } finally {
       setUploadingId(null);
     }
@@ -197,9 +282,10 @@ export default function AdminYonetimPage() {
       price: '22.500 ₺',
       stockStatus: 'Stokta Mevcut',
       img: '/products/segway-scooter.svg',
+      images: [],
     };
     setCatalog({ ...catalog, scooters: [newItem, ...catalog.scooters] });
-    notify('Yeni araç satırı eklendi. Düzenleyip "Değişiklikleri Kaydet" butonuna basın.');
+    notify('Yeni araç eklendi. 3+ adet fotoğraf yükleyip "Değişiklikleri Kaydet" butonuna basın.');
   }
 
   function removeScooter(id: string) {
@@ -313,7 +399,7 @@ export default function AdminYonetimPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 pt-1">
-              Bu sayfa müşterilere gizlidir. Yaptığınız fiyat, stok ve görsel değişikliklerini kaydettikten sonra vitrinde anında görebilirsiniz.
+              Her scooter ilanı için 3 veya daha fazla fotoğraf yükleyebilir, kapak fotoğrafını seçebilir ve fiyatları anında güncelleyebilirsiniz.
             </p>
           </div>
 
@@ -343,13 +429,6 @@ export default function AdminYonetimPage() {
             </button>
           </div>
         </div>
-
-        {!persistentInCloud && (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
-            <b>Kalıcı Bulut Depolama Bilgilendirmesi:</b> Canlı Vercel sunucusunda yüklediğiniz fotoğrafların ve fiyatların sunucu yeniden başlasa bile kalıcı olması için Vercel proje panelinizden{' '}
-            <b>Storage → Create Database → Blob (Ücretsiz)</b> seçeneğini aktif etmeniz yeterlidir (kodunuz otomatik olarak tanıyacaktır).
-          </div>
-        )}
 
         {/* Modül Sekmeleri */}
         <div className="inline-flex p-1 rounded-xl bg-slate-200/70 border border-slate-200">
@@ -382,168 +461,283 @@ export default function AdminYonetimPage() {
           </button>
         </div>
 
-        {/* SEKME 1: SCOOTER DÜZENLEME */}
+        {/* SEKME 1: SCOOTER DÜZENLEME (ÇOKLU FOTOĞRAF DESTEKLİ: EN AZ 3+ YUVA) */}
         {tab === 'scooters' && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">Sıfır & 2. El Scooter Fiyat ve Görsel Yönetimi</h2>
+              <div>
+                <h2 className="text-lg font-bold">Sıfır & 2. El Scooter Fiyat ve Çoklu Fotoğraf Yönetimi</h2>
+                <p className="text-xs text-slate-500">
+                  Her araç için 1., 2., 3. fotoğraf yuvalarını doldurabilir veya toplu seçimle birden fazla fotoğraf ekleyebilirsiniz.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={addScooter}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold cursor-pointer shrink-0"
               >
                 + Yeni Scooter Ekle
               </button>
             </div>
 
-            {catalog.scooters.map((s) => (
-              <div
-                key={s.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 grid md:grid-cols-12 gap-5 items-center"
-              >
-                <div className="md:col-span-3 space-y-2">
-                  <img
-                    src={s.img}
-                    alt={s.name}
-                    className="w-full h-36 object-cover rounded-xl border border-slate-200 bg-slate-50"
-                  />
-                  <label className="cursor-pointer w-full py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5">
-                    <span>
-                      {uploadingId === s.id ? 'Yükleniyor...' : 'Fotoğraf Seç / Değiştir'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploadingId === s.id}
-                      onChange={(e) => handleFileSelect(e.target.files?.[0], 'scooter', s.id)}
-                    />
-                  </label>
-                </div>
+            {catalog.scooters.map((s) => {
+              const allImgs = getScooterImages(s);
+              const realImgs =
+                allImgs.length === 1 && isPlaceholderSvg(allImgs[0]) ? [] : allImgs;
+              const slotCount = Math.max(3, realImgs.length);
 
-                <div className="md:col-span-7 grid sm:grid-cols-3 gap-3 text-sm">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Model Başlığı</label>
-                    <input
-                      value={s.name}
-                      onChange={(e) => updateScooterField(s.id, 'name', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Fiyat</label>
-                    <input
-                      value={s.price}
-                      onChange={(e) => updateScooterField(s.id, 'price', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold tabular"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Durum</label>
-                    <select
-                      value={s.cond}
-                      onChange={(e) =>
-                        updateScooterField(s.id, 'cond', e.target.value as ScooterCondition)
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="Sıfır">Sıfır Scooter</option>
-                      <option value="2. El">2. El Garantili</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Marka</label>
-                    <select
-                      value={s.brand}
-                      onChange={(e) =>
-                        updateScooterField(s.id, 'brand', e.target.value as BrandName)
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="Segway">Segway</option>
-                      <option value="ONVO">ONVO</option>
-                      <option value="Diğer">Diğer</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Pil Sağlığı (%)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={s.battery}
-                      onChange={(e) =>
-                        updateScooterField(s.id, 'battery', Number(e.target.value || 100))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 tabular"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Garanti / Alt Etiket
-                    </label>
-                    <input
-                      value={s.badge}
-                      onChange={(e) => updateScooterField(s.id, 'badge', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Stok Durumu
-                    </label>
-                    <select
-                      value={s.stockStatus}
-                      onChange={(e) =>
-                        updateScooterField(
-                          s.id,
-                          'stockStatus',
-                          e.target.value as ScooterItem['stockStatus']
-                        )
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="Stokta Mevcut">Stokta Mevcut</option>
-                      <option value="Sipariş Üzerine">Sipariş Üzerine</option>
-                      <option value="Tükendi">Tükendi</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Teknik Özellikler / Ekspertiz Notu
-                    </label>
-                    <input
-                      value={s.desc}
-                      onChange={(e) => updateScooterField(s.id, 'desc', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                    />
-                  </div>
-                </div>
+              return (
+                <div
+                  key={s.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-5 space-y-5"
+                >
+                  {/* Üst Kısım: Çoklu Fotoğraf Galerisi (En az 3 görünür yuva + Toplu Ekleme) */}
+                  <div className="pb-4 border-b border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <span className="text-xs font-bold text-slate-700">
+                        Araç Fotoğrafları ({realImgs.length} yüklü • İlk sıradaki kapak görselidir)
+                      </span>
+                      <label className="cursor-pointer px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5">
+                        <span>
+                          {uploadingId === s.id
+                            ? 'Fotoğraflar Yükleniyor...'
+                            : '+ Çoklu Fotoğraf Seç / Ekle'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingId === s.id}
+                          onChange={(e) => {
+                            handleScooterImagesUpload(e.target.files, s.id);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
 
-                <div className="md:col-span-2 flex md:flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => persistCatalog(catalog)}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
-                  >
-                    Kaydet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeScooter(s.id)}
-                    className="py-2 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer"
-                  >
-                    Sil
-                  </button>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {Array.from({ length: slotCount }).map((_, idx) => {
+                        const imgUrl = realImgs[idx];
+                        return imgUrl ? (
+                          <div
+                            key={`${s.id}-img-${idx}`}
+                            className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-50 h-32"
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`${s.name} - ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <span
+                              className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-bold ${
+                                idx === 0
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-900/75 text-white'
+                              }`}
+                            >
+                              {idx === 0 ? '1. Kapak' : `${idx + 1}. Fotoğraf`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeScooterImage(s.id, idx)}
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center cursor-pointer"
+                              title="Fotoğrafı Sil"
+                            >
+                              ✕
+                            </button>
+                            <div className="absolute inset-x-0 bottom-0 p-1.5 bg-slate-950/70 flex items-center justify-between gap-1">
+                              {idx !== 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => makeCoverImage(s.id, idx)}
+                                  className="text-[11px] font-semibold text-amber-300 hover:underline cursor-pointer"
+                                >
+                                  Kapak Yap
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-emerald-300 font-medium">
+                                  Ana Vitrin
+                                </span>
+                              )}
+                              <label className="cursor-pointer text-[11px] font-semibold text-white hover:underline">
+                                Değiştir
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={uploadingId === s.id}
+                                  onChange={(e) => {
+                                    handleScooterImagesUpload(e.target.files, s.id, idx);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <label
+                            key={`${s.id}-empty-${idx}`}
+                            className="cursor-pointer h-32 rounded-xl border-2 border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/70 hover:bg-slate-100/70 flex flex-col items-center justify-center text-center p-3 transition-colors"
+                          >
+                            <span className="text-lg font-bold text-slate-400">+</span>
+                            <span className="text-xs font-semibold text-slate-600 mt-0.5">
+                              {idx + 1}. Fotoğraf Ekle
+                            </span>
+                            <span className="text-[11px] text-slate-400">Tıklayıp seçin</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              disabled={uploadingId === s.id}
+                              onChange={(e) => {
+                                handleScooterImagesUpload(e.target.files, s.id);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Alt Kısım: Ürün Bilgileri & Kaydet/Sil */}
+                  <div className="grid md:grid-cols-12 gap-5 items-center">
+                    <div className="md:col-span-10 grid sm:grid-cols-3 gap-3 text-sm">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Model Başlığı
+                        </label>
+                        <input
+                          value={s.name}
+                          onChange={(e) => updateScooterField(s.id, 'name', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Fiyat
+                        </label>
+                        <input
+                          value={s.price}
+                          onChange={(e) => updateScooterField(s.id, 'price', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold tabular"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Durum
+                        </label>
+                        <select
+                          value={s.cond}
+                          onChange={(e) =>
+                            updateScooterField(s.id, 'cond', e.target.value as ScooterCondition)
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                        >
+                          <option value="Sıfır">Sıfır Scooter</option>
+                          <option value="2. El">2. El Garantili</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Marka
+                        </label>
+                        <select
+                          value={s.brand}
+                          onChange={(e) =>
+                            updateScooterField(s.id, 'brand', e.target.value as BrandName)
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                        >
+                          <option value="Segway">Segway</option>
+                          <option value="ONVO">ONVO</option>
+                          <option value="Diğer">Diğer</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Pil Sağlığı (%)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={s.battery}
+                          onChange={(e) =>
+                            updateScooterField(s.id, 'battery', Number(e.target.value || 100))
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 tabular"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Garanti / Alt Etiket
+                        </label>
+                        <input
+                          value={s.badge}
+                          onChange={(e) => updateScooterField(s.id, 'badge', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Stok Durumu
+                        </label>
+                        <select
+                          value={s.stockStatus}
+                          onChange={(e) =>
+                            updateScooterField(
+                              s.id,
+                              'stockStatus',
+                              e.target.value as ScooterItem['stockStatus']
+                            )
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                        >
+                          <option value="Stokta Mevcut">Stokta Mevcut</option>
+                          <option value="Sipariş Üzerine">Sipariş Üzerine</option>
+                          <option value="Tükendi">Tükendi</option>
+                        </select>
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Teknik Özellikler / Ekspertiz Notu
+                        </label>
+                        <input
+                          value={s.desc}
+                          onChange={(e) => updateScooterField(s.id, 'desc', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 flex md:flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => persistCatalog(catalog)}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                      >
+                        Kaydet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeScooter(s.id)}
+                        className="py-2 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer"
+                      >
+                        İlanı Sil
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        {/* SEKME 2: YEDEK PARÇA DÜZENLEME */}
+        {/* SEKME 2: YEDEK PARÇA DÜZENLEME (TEK FOTOĞRAF YETERLİ) */}
         {tab === 'parts' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -577,7 +771,7 @@ export default function AdminYonetimPage() {
                       accept="image/*"
                       className="hidden"
                       disabled={uploadingId === p.id}
-                      onChange={(e) => handleFileSelect(e.target.files?.[0], 'part', p.id)}
+                      onChange={(e) => handlePartImageUpload(e.target.files?.[0], p.id)}
                     />
                   </label>
                 </div>

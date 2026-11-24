@@ -14,6 +14,14 @@ export interface ScooterItem {
   price: string;
   stockStatus: 'Stokta Mevcut' | 'Sipariş Üzerine' | 'Tükendi';
   img: string;
+  images?: string[];
+}
+
+export function getScooterImages(s: ScooterItem): string[] {
+  const arr = Array.isArray(s.images) ? s.images.filter((u) => typeof u === 'string' && u.trim().length > 0) : [];
+  if (arr.length > 0) return arr;
+  if (s.img && s.img.trim().length > 0) return [s.img];
+  return ['/products/segway-scooter.svg'];
 }
 
 export interface SparePartItem {

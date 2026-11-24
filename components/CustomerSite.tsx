@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CatalogData,
+  getScooterImages,
   NormalizedServiceRecord,
+  ScooterItem,
   ThemeKey,
 } from '@/lib/types';
 
-type PageTab = 'home' | 'scooters' | 'parts';
+type PageTab = 'home' | 'scooters' | 'parts' | 'service';
 
 interface CartItem {
   id: string;
@@ -17,6 +19,12 @@ interface CartItem {
   qty: number;
   img: string;
   category: string;
+}
+
+interface LightboxState {
+  images: Array<{ src: string; label?: string }>;
+  index: number;
+  title: string;
 }
 
 function parsePriceNumber(priceStr: string): number {
@@ -29,10 +37,12 @@ function parsePriceNumber(priceStr: string): number {
 }
 
 function formatTL(amount: number): string {
-  return new Intl.NumberFormat('tr-TR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.round(amount)) + ' ₺';
+  return (
+    new Intl.NumberFormat('tr-TR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(Math.round(amount)) + ' ₺'
+  );
 }
 
 const STAGES = [
@@ -174,6 +184,179 @@ function WhatsAppIcon({ className = 'w-4 h-4' }: { className?: string }) {
   );
 }
 
+// Çoklu Fotoğraf Kaydırmalı Scooter İlan Kartı
+function ScooterCard({
+  scooter,
+  themeKey,
+  t,
+  buildWaUrl,
+  onOpenGallery,
+  onAddCart,
+}: {
+  scooter: ScooterItem;
+  themeKey: ThemeKey;
+  t: (typeof THEMES)[ThemeKey];
+  buildWaUrl: (msg: string) => string;
+  onOpenGallery: (images: Array<{ src: string }>, startIndex: number, title: string) => void;
+  onAddCart: () => void;
+}) {
+  const imgs = getScooterImages(scooter);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const safeIdx = activeIdx < imgs.length ? activeIdx : 0;
+
+  function prevImg(e: React.MouseEvent) {
+    e.stopPropagation();
+    setActiveIdx((i) => (i - 1 + imgs.length) % imgs.length);
+  }
+  function nextImg(e: React.MouseEvent) {
+    e.stopPropagation();
+    setActiveIdx((i) => (i + 1) % imgs.length);
+  }
+
+  return (
+    <article
+      className={`rounded-2xl border ${t.surfaceBg} overflow-hidden flex flex-col justify-between card-lift`}
+    >
+      <div>
+        <div
+          onClick={() =>
+            onOpenGallery(
+              imgs.map((src) => ({ src })),
+              safeIdx,
+              scooter.name
+            )
+          }
+          className="cursor-pointer group relative h-56 bg-slate-100 border-b border-slate-200/60 overflow-hidden"
+        >
+          <img
+            src={imgs[safeIdx]}
+            alt={`${scooter.name} - Görsel ${safeIdx + 1}`}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          />
+
+          <span
+            className={`absolute top-3 left-3 px-3 py-1 rounded-lg text-xs font-bold ${
+              scooter.cond === 'Sıfır' ? t.badgePrimary : t.badgeUsed
+            }`}
+          >
+            {scooter.cond === 'Sıfır' ? 'Sıfır Kutu' : '2. El Ekspertizli'}
+          </span>
+
+          <span className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-white/95 text-slate-900 text-xs font-semibold tabular shadow-xs">
+            Pil: %{scooter.battery}
+          </span>
+
+          {/* Çoklu Fotoğraf Okları ve Sayacı */}
+          {imgs.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={prevImg}
+                aria-label="Önceki fotoğraf"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center text-base font-bold cursor-pointer transition-opacity"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={nextImg}
+                aria-label="Sonraki fotoğraf"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center text-base font-bold cursor-pointer transition-opacity"
+              >
+                ›
+              </button>
+              <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-900/65">
+                  {imgs.map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveIdx(dotIdx);
+                      }}
+                      className={`h-1.5 rounded-full cursor-pointer transition-all ${
+                        dotIdx === safeIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'
+                      }`}
+                      aria-label={`${dotIdx + 1}. fotoğraf`}
+                    />
+                  ))}
+                </div>
+                <span className="px-2 py-0.5 rounded-md bg-slate-900/70 text-white text-[11px] font-semibold tabular">
+                  {safeIdx + 1} / {imgs.length} Fotoğraf
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Küçük Thumbnail Şeridi (Birden fazla fotoğraf varsa kart üstünde hızlı önizleme) */}
+        {imgs.length > 1 && (
+          <div className={`px-4 pt-3 flex items-center gap-2 overflow-x-auto no-scrollbar`}>
+            {imgs.map((thumb, idx) => (
+              <button
+                key={`${scooter.id}-th-${idx}`}
+                type="button"
+                onClick={() => setActiveIdx(idx)}
+                className={`w-12 h-10 rounded-lg overflow-hidden border-2 shrink-0 cursor-pointer transition-all ${
+                  idx === safeIdx
+                    ? 'border-emerald-600 opacity-100'
+                    : 'border-transparent opacity-65 hover:opacity-100'
+                }`}
+              >
+                <img src={thumb} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="p-5">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            {scooter.brand === 'Segway' || scooter.brand === 'ONVO' ? (
+              <img
+                src={scooter.brand === 'Segway' ? '/logos/segway.png' : '/logos/onvo.png'}
+                alt={scooter.brand}
+                className={`h-5 w-auto object-contain ${
+                  themeKey === 'c4' && scooter.brand === 'Segway' ? 'logo-white' : ''
+                }`}
+              />
+            ) : (
+              <span className={`text-xs font-bold ${t.muted}`}>{scooter.brand}</span>
+            )}
+            <span className={`text-xs font-medium ${t.muted}`}>{scooter.stockStatus}</span>
+          </div>
+          <h3 className={`font-bold text-lg ${t.title} mt-2`}>{scooter.name}</h3>
+          <p className={`text-sm ${t.body} mt-1.5 leading-relaxed`}>{scooter.desc}</p>
+          <div className="text-xs text-emerald-600 font-medium mt-2">{scooter.badge}</div>
+        </div>
+      </div>
+
+      <div className={`px-5 py-4 border-t ${t.divider} flex items-center justify-between gap-3`}>
+        <span className={`font-bold text-xl tabular ${t.title}`}>{scooter.price}</span>
+        <div className="flex items-center gap-2">
+          <a
+            href={buildWaUrl(
+              `Merhaba Alfa Garaj, "${scooter.name}" (${scooter.cond} - ${scooter.price}) ilanınız hakkında bilgi almak istiyorum.`
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 rounded-xl bg-[#25D366]/15 text-emerald-700 hover:bg-[#25D366] hover:text-white text-xs font-semibold transition-colors"
+          >
+            WhatsApp Sor
+          </a>
+          <button
+            type="button"
+            onClick={onAddCart}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${t.primaryBtn}`}
+          >
+            Sepete Ekle
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function CustomerSite({
   initialCatalog,
   initialTab = 'home',
@@ -194,17 +377,38 @@ export default function CustomerSite({
   const [trackError, setTrackError] = useState<string | null>(null);
   const [trackRecords, setTrackRecords] = useState<NormalizedServiceRecord[]>([]);
 
-  // Sepet & Modallar
+  // Sepet & Çoklu Fotoğraf Lightbox Modalları
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [waModalOpen, setWaModalOpen] = useState(false);
-  const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null);
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const settings = initialCatalog.settings;
   const themeKey: ThemeKey = THEMES[settings.theme] ? settings.theme : 'c1';
   const t = THEMES[themeKey];
   const waNum = settings.whatsappNumber || '905321352815';
+
+  // Lightbox klavye yön tuşları desteği
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+      else if (e.key === 'ArrowRight') {
+        setLightbox((prev) =>
+          prev ? { ...prev, index: (prev.index + 1) % prev.images.length } : null
+        );
+      } else if (e.key === 'ArrowLeft') {
+        setLightbox((prev) =>
+          prev
+            ? { ...prev, index: (prev.index - 1 + prev.images.length) % prev.images.length }
+            : null
+        );
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -295,7 +499,10 @@ export default function CustomerSite({
   }
 
   const cartCount = useMemo(() => cart.reduce((acc, x) => acc + x.qty, 0), [cart]);
-  const cartTotal = useMemo(() => cart.reduce((acc, x) => acc + x.unitPrice * x.qty, 0), [cart]);
+  const cartTotal = useMemo(
+    () => cart.reduce((acc, x) => acc + x.unitPrice * x.qty, 0),
+    [cart]
+  );
 
   function checkoutViaWhatsApp() {
     if (cart.length === 0) return;
@@ -330,11 +537,443 @@ export default function CustomerSite({
   }, [initialCatalog.parts, partBrand, partSearch]);
 
   const BrandBadges = (
-    <div className="inline-flex items-center gap-5 px-5 py-2.5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-      <img src="/logos/segway.png" alt="Segway Yetkili & Özel Servis" className="h-9 w-auto object-contain" />
-      <span className="h-7 w-px bg-slate-200" />
-      <img src="/logos/onvo.png" alt="ONVO Scooter Servis" className="h-8 w-auto object-contain" />
+    <div className="inline-flex items-center gap-5 px-4 py-2 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+      <img src="/logos/segway.png" alt="Segway Servis" className="h-8 w-auto object-contain" />
+      <span className="h-6 w-px bg-slate-200" />
+      <img src="/logos/onvo.png" alt="ONVO Scooter Servis" className="h-7 w-auto object-contain" />
     </div>
+  );
+
+  // Ortak Scooter Satış Vitrini Bloğu (Hem Ana Sayfa Üstünde hem /scooterlar sekmesinde kullanılır)
+  const ScooterShowcaseSection = (
+    <section id="scooter-vitrini" className="space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div>
+          <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
+            Araç Satış & Ekspertiz Vitrini
+          </span>
+          <h2 className={`text-2xl sm:text-3xl font-bold ${t.title} mt-0.5`}>
+            2. El Garantili & Sıfır Scooter Satışı
+          </h2>
+          <p className={`text-sm ${t.muted} mt-1`}>
+            Alfa Garaj atölyesinde ekspertizi yapılmış garantili ikinci el ve sıfır kapalı kutu Segway / ONVO modelleri.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg}`}>
+            {(
+              [
+                { v: 'Tümü', l: 'Tüm Araçlar' },
+                { v: '2. El', l: '2. El Garantili' },
+                { v: 'Sıfır', l: 'Sıfır Scooter' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setScooterCond(opt.v)}
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                  scooterCond === opt.v ? t.pillActive : t.pillIdle
+                }`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
+
+          <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg}`}>
+            {(['Tümü', 'Segway', 'ONVO'] as const).map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setScooterBrand(b)}
+                className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                  scooterBrand === b ? t.pillActive : t.pillIdle
+                }`}
+              >
+                {b === 'Tümü' ? 'Tüm Markalar' : b}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {filteredScooters.length === 0 ? (
+        <div className={`p-8 rounded-2xl border ${t.surfaceBg} text-center text-sm ${t.muted}`}>
+          Seçilen filtreye uygun araç bulunamadı.
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredScooters.map((s) => (
+            <ScooterCard
+              key={s.id}
+              scooter={s}
+              themeKey={themeKey}
+              t={t}
+              buildWaUrl={buildWaUrl}
+              onOpenGallery={(images, startIndex, title) =>
+                setLightbox({ images, index: startIndex, title })
+              }
+              onAddCart={() =>
+                addToCart({
+                  id: s.id,
+                  name: s.name,
+                  price: s.price,
+                  img: getScooterImages(s)[0],
+                  category: `${s.cond} Scooter`,
+                })
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 2. El Alım & Takas Değerlendirme Kutusu */}
+      <div
+        className={`rounded-2xl border p-5 sm:p-6 ${t.subtleBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}
+      >
+        <div>
+          <h3 className={`font-bold text-base ${t.title}`}>
+            Scooter&apos;ınızı Satmak veya Takasa Vermek mi İstiyorsunuz?
+          </h3>
+          <p className={`text-sm ${t.body} mt-0.5`}>
+            Aracınızın fotoğraflarını ve kilometre bilgisini WhatsApp&apos;tan gönderin, ön ekspertiz değerlemesini hemen iletelim.
+          </p>
+        </div>
+        <a
+          href={buildWaUrl(
+            'Merhaba Alfa Garaj, ikinci el elektrikli scooterımı satmak / takas değerlendirmesi yaptırmak istiyorum.'
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-5 py-3 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold text-sm inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+        >
+          <WhatsAppIcon />
+          <span>2. El Değerleme Gönder</span>
+        </a>
+      </div>
+    </section>
+  );
+
+  // Ortak Yedek Parça Satış Vitrini Bloğu (Hem Ana Sayfa Üstünde hem /yedek-parca sekmesinde kullanılır)
+  const PartsShowcaseSection = (
+    <section id="yedek-parca-vitrini" className="space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div>
+          <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
+            Orijinal Bileşen Stoğu
+          </span>
+          <h2 className={`text-2xl sm:text-3xl font-bold ${t.title} mt-0.5`}>
+            Segway & ONVO Yedek Parça Satışı
+          </h2>
+          <p className={`text-sm ${t.muted} mt-1`}>
+            Orijinal uyumlu yedek parçaları kargo ile sipariş verebilir veya Gebze servisimizde montaj yaptırabilirsiniz.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <input
+            type="text"
+            value={partSearch}
+            onChange={(e) => setPartSearch(e.target.value)}
+            placeholder="Parça adı veya model ara..."
+            className={`px-3.5 py-2 rounded-xl border text-xs sm:text-sm focus:outline-none ${t.inputCls}`}
+          />
+          <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg} self-start`}>
+            {(
+              [
+                { v: 'Tümü', l: 'Tüm Parçalar' },
+                { v: 'Segway', l: 'Segway Parçaları' },
+                { v: 'ONVO', l: 'ONVO Parçaları' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setPartBrand(opt.v)}
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                  partBrand === opt.v ? t.pillActive : t.pillIdle
+                }`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {filteredParts.length === 0 ? (
+        <div className={`p-8 rounded-2xl border ${t.surfaceBg} text-center text-sm ${t.muted}`}>
+          Aradığınız kriterde yedek parça bulunamadı. WhatsApp hattımızdan stok sorabilirsiniz.
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {filteredParts.map((p) => (
+            <article
+              key={p.id}
+              className={`rounded-2xl border ${t.surfaceBg} overflow-hidden flex flex-col justify-between card-lift`}
+            >
+              <div>
+                <div
+                  onClick={() =>
+                    setLightbox({
+                      images: [{ src: p.img }],
+                      index: 0,
+                      title: p.name,
+                    })
+                  }
+                  className="cursor-pointer h-44 bg-slate-100 border-b border-slate-200/60 overflow-hidden relative"
+                >
+                  <img src={p.img} alt={p.name} className="w-full h-full object-cover" />
+                  <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/95 text-slate-700 font-mono text-[11px] font-semibold">
+                    {p.code}
+                  </span>
+                </div>
+                <div className="p-4">
+                  {p.brand === 'Segway' || p.brand === 'ONVO' ? (
+                    <img
+                      src={p.brand === 'Segway' ? '/logos/segway.png' : '/logos/onvo.png'}
+                      alt={p.brand}
+                      className={`h-4 w-auto object-contain mb-2 ${
+                        themeKey === 'c4' && p.brand === 'Segway' ? 'logo-white' : ''
+                      }`}
+                    />
+                  ) : (
+                    <span className={`text-xs font-bold block mb-1 ${t.muted}`}>{p.brand}</span>
+                  )}
+                  <h3 className={`font-semibold text-sm ${t.title} leading-snug`}>{p.name}</h3>
+                  <p className={`text-xs ${t.muted} mt-1.5`}>Uyumlu: {p.compat}</p>
+                  <div
+                    className={`text-xs font-medium mt-1 tabular ${
+                      p.stock > 0 ? 'text-emerald-600' : 'text-rose-500'
+                    }`}
+                  >
+                    {p.stock > 0 ? `Stokta (${p.stock} adet)` : 'Stok Sorunuz'}
+                  </div>
+                </div>
+              </div>
+              <div className={`px-4 py-3.5 border-t ${t.divider} flex items-center justify-between`}>
+                <span className={`font-bold text-base tabular ${t.title}`}>{p.price}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    addToCart({
+                      id: p.id,
+                      name: p.name,
+                      price: p.price,
+                      img: p.img,
+                      category: 'Yedek Parça',
+                    })
+                  }
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer ${t.primaryBtn}`}
+                >
+                  Sepete Ekle
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+
+  // Ortak Canlı Servis Durumu Sorgulama Bloğu
+  const ServiceTrackingSection = (
+    <section id="servis-sorgula" className={`rounded-3xl border p-6 sm:p-8 ${t.surfaceBg} elevated`}>
+      <div>
+        <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
+          Alfa Servis Takip Sistemi
+        </span>
+        <h2 className={`text-xl sm:text-2xl font-bold ${t.title} mt-0.5`}>
+          Canlı Servis Durumu Sorgulama
+        </h2>
+        <p className={`text-sm ${t.muted} mt-1`}>
+          Servise bıraktığınız cihazın kayıtlı cep telefonu numarasını veya servis fiş kodunu girerek güncel aşamayı ve servis fotoğraflarını görüntüleyin.
+        </p>
+      </div>
+
+      <form onSubmit={handleServiceQuery} className="mt-5 flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          value={queryText}
+          onChange={(e) => setQueryText(e.target.value)}
+          placeholder="Cep Telefonu Numaranız (05XX...) veya Servis Fiş Numarası"
+          className={`flex-1 px-4 py-3.5 rounded-xl border text-sm tabular focus:outline-none ${t.inputCls}`}
+        />
+        <button
+          type="submit"
+          disabled={trackLoading}
+          className={`px-7 py-3.5 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer disabled:opacity-60 ${t.primaryBtn}`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+          </svg>
+          <span>{trackLoading ? 'Sorgulanıyor...' : 'Cihazımı Sorgula'}</span>
+        </button>
+      </form>
+
+      {trackError && (
+        <div className={`mt-5 p-4 rounded-xl border ${t.subtleBg} text-sm text-rose-600 font-medium`}>
+          {trackError}
+        </div>
+      )}
+
+      {trackSearched && !trackLoading && !trackError && trackRecords.length === 0 && (
+        <div className={`mt-5 p-5 rounded-2xl border ${t.subtleBg} text-sm ${t.body}`}>
+          Girilen telefon numarası veya servis koduna ait aktif bir servis kaydı bulunamadı. Lütfen kayıt esnasında verdiğiniz telefon numarasını kontrol edin veya{' '}
+          <a
+            href={buildWaUrl(
+              'Merhaba Alfa Garaj, servisteki cihazımın durumu hakkında bilgi almak istiyorum.'
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`underline font-semibold ${t.title}`}
+          >
+            WhatsApp hattımızdan
+          </a>{' '}
+          destek alın.
+        </div>
+      )}
+
+      {trackRecords.length > 0 && (
+        <div className="mt-6 space-y-6">
+          {trackRecords.map((rec) => {
+            const pct = Math.round(((rec.stageIndex + 1) / STAGES.length) * 100);
+            return (
+              <div key={rec.id} className={`p-6 rounded-2xl border ${t.subtleBg} space-y-5`}>
+                <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b ${t.divider}`}>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-lg text-xs font-bold tabular ${t.badgePrimary}`}>
+                      #{rec.code}
+                    </span>
+                    <div>
+                      <div className={`font-bold text-base ${t.title}`}>{rec.deviceTitle}</div>
+                      <div className={`text-xs ${t.muted}`}>
+                        {rec.customerName}
+                        {rec.maskedPhone ? ` • ${rec.maskedPhone}` : ''}
+                        {rec.createdAtText ? ` • Kayıt: ${rec.createdAtText}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                        rec.stageIndex === 4
+                          ? 'bg-emerald-500/15 text-emerald-700'
+                          : rec.needsQuoteApproval
+                          ? 'bg-rose-500/15 text-rose-700'
+                          : 'bg-amber-500/15 text-amber-800'
+                      }`}
+                    >
+                      {rec.statusLabel}
+                    </span>
+                    {rec.needsQuoteApproval && (
+                      <a
+                        href={rec.approvalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                      >
+                        Fiyat Teklifini Onayla →
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className={`h-2 w-full rounded-full ${t.barTrack} overflow-hidden`}>
+                    <div
+                      className={`h-full rounded-full ${t.barFill} transition-all duration-500`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+                    {STAGES.map((st, idx) => (
+                      <div
+                        key={st}
+                        className={`text-xs ${
+                          idx <= rec.stageIndex ? `${t.title} font-semibold` : t.muted
+                        }`}
+                      >
+                        <span className="tabular">{idx + 1}.</span> {st}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-12 gap-5 pt-1 items-start">
+                  {rec.photos.length > 0 && (
+                    <div className="md:col-span-5">
+                      <div className={`text-xs font-semibold ${t.muted} mb-2`}>
+                        Servis Cihaz Görselleri (Büyütmek için tıklayın)
+                      </div>
+                      <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                        {rec.photos.map((ph, i) => (
+                          <button
+                            key={`${ph.url}-${i}`}
+                            type="button"
+                            onClick={() =>
+                              setLightbox({
+                                images: rec.photos.map((p) => ({
+                                  src: p.url,
+                                  label: p.label,
+                                })),
+                                index: i,
+                                title: rec.deviceTitle,
+                              })
+                            }
+                            className="group relative w-28 h-20 rounded-xl overflow-hidden border border-slate-300/70 bg-white shrink-0 cursor-pointer"
+                          >
+                            <img
+                              src={ph.url}
+                              alt={ph.label}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <span className="absolute inset-x-0 bottom-0 bg-slate-900/75 text-white text-[10px] px-1.5 py-0.5 truncate">
+                              {ph.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={`${
+                      rec.photos.length > 0 ? 'md:col-span-7' : 'md:col-span-12'
+                    } p-4 rounded-xl border ${t.surfaceBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}
+                  >
+                    <div className="space-y-1.5 text-sm">
+                      <div>
+                        <span className={`text-xs font-semibold ${t.muted}`}>Arıza / Talep: </span>
+                        <span className={`${t.title} font-medium`}>{rec.issue}</span>
+                      </div>
+                      <div>
+                        <span className={`text-xs font-semibold ${t.muted}`}>Servis Notu: </span>
+                        <span className={t.body}>{rec.techNote}</span>
+                      </div>
+                    </div>
+
+                    {rec.showPrice && typeof rec.totalPrice === 'number' && rec.totalPrice > 0 && (
+                      <div
+                        className={`shrink-0 sm:text-right border-t sm:border-t-0 sm:border-l ${t.divider} pt-3 sm:pt-0 sm:pl-4`}
+                      >
+                        <span className={`block text-xs ${t.muted}`}>Toplam Tutar</span>
+                        <span className={`text-lg font-bold tabular ${t.title}`}>
+                          {formatTL(rec.totalPrice)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 
   return (
@@ -355,8 +994,10 @@ export default function CustomerSite({
           </div>
         </div>
 
-        {/* Ana Navigasyon Barı (Müşteri görünümünde Admin linki yoktur) */}
-        <header className={`border-b ${t.headerBg} px-4 sm:px-8 py-4 sticky top-0 z-40 backdrop-blur-md bg-opacity-95`}>
+        {/* Ana Navigasyon Barı (Müşteriye Admin linki gizlidir) */}
+        <header
+          className={`border-b ${t.headerBg} px-4 sm:px-8 py-4 sticky top-0 z-40 backdrop-blur-md bg-opacity-95`}
+        >
           <div className="max-w-6xl mx-auto flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
             <button
               type="button"
@@ -371,7 +1012,7 @@ export default function CustomerSite({
               />
             </button>
 
-            {/* Ayrı Sayfa Sekmeleri */}
+            {/* Öncelikli Satış & Servis Sekmeleri */}
             <nav
               aria-label="Ana Menü"
               className={`flex items-center gap-1 sm:gap-1.5 p-1 rounded-xl border ${t.pillWrapBg} order-3 md:order-2 w-full md:w-auto justify-center overflow-x-auto no-scrollbar`}
@@ -379,29 +1020,38 @@ export default function CustomerSite({
               <button
                 type="button"
                 onClick={() => switchPage('home')}
-                className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
                   page === 'home' ? t.pillActive : t.pillIdle
                 }`}
               >
-                Servis Sorgula
+                Ana Vitrin
               </button>
               <button
                 type="button"
                 onClick={() => switchPage('scooters')}
-                className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
                   page === 'scooters' ? t.pillActive : t.pillIdle
                 }`}
               >
-                Sıfır & 2. El Scooter
+                2. El & Sıfır Scooter
               </button>
               <button
                 type="button"
                 onClick={() => switchPage('parts')}
-                className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
                   page === 'parts' ? t.pillActive : t.pillIdle
                 }`}
               >
                 Yedek Parça
+              </button>
+              <button
+                type="button"
+                onClick={() => switchPage('service')}
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                  page === 'service' ? t.pillActive : t.pillIdle
+                }`}
+              >
+                Servis Sorgula
               </button>
             </nav>
 
@@ -431,323 +1081,74 @@ export default function CustomerSite({
         </header>
 
         {/* =============================================================== */}
-        {/* BÖLÜM 1: ANA SAYFA & CANLI SERVİS DURUMU SORGULAMA              */}
+        {/* ANA VİTRİN: SCOOTER SATIŞ & YEDEK PARÇA ÜST TARAFTA!            */}
         {/* =============================================================== */}
         {page === 'home' && (
-          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10 space-y-10">
-            {/* Karşılama Hero */}
-            <section className={`rounded-3xl p-7 sm:p-10 ${t.heroBg}`}>
-              <div className="grid lg:grid-cols-12 gap-8 items-center">
-                <div className="lg:col-span-8 space-y-5">
+          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-12">
+            {/* Kompakt Üst Marka & Hızlı Yönlendirme Bandı */}
+            <section className={`rounded-3xl p-6 sm:p-8 ${t.heroBg}`}>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="space-y-3 max-w-2xl">
                   {BrandBadges}
                   <h1
-                    className={`text-2xl sm:text-4xl font-bold tracking-tight leading-[1.2] ${
+                    className={`text-2xl sm:text-3xl font-bold tracking-tight leading-snug ${
                       t.heroIsDark ? 'text-white' : t.title
                     }`}
                   >
-                    Segway ve ONVO Uzman Teknik Servis, Yedek Parça ve Satış Merkezi
+                    Segway & ONVO 2. El / Sıfır Scooter Mağazası, Yedek Parça ve Teknik Servis
                   </h1>
                   <p
-                    className={`text-sm sm:text-base leading-relaxed max-w-2xl ${
+                    className={`text-sm leading-relaxed ${
                       t.heroIsDark ? 'text-slate-200' : t.body
                     }`}
                   >
-                    Gebze Alfa Garaj güvencesiyle servisteki elektrikli scooter&apos;ınızın güncel onarım aşamasını ve servis fotoğraflarını aşağıdan anlık sorgulayabilir; orijinal yedek parça, sıfır ve ekspertiz garantili ikinci el araçlarımızı inceleyebilirsiniz.
+                    Ekspertiz garantili ikinci el ve sıfır elektrikli scooter ilanlarımızı ve orijinal yedek parçalarımızı hemen aşağıdan inceleyebilir veya servisteki cihazınızın durumunu sorgulayabilirsiniz.
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => switchPage('scooters')}
-                      className={`px-5 py-3 rounded-xl font-semibold text-sm cursor-pointer transition-colors ${
-                        t.heroIsDark ? 'bg-white text-slate-900 hover:bg-slate-100' : t.primaryBtn
-                      }`}
-                    >
-                      Sıfır & 2. El Scooterları İncele →
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => switchPage('parts')}
-                      className={`px-5 py-3 rounded-xl font-semibold text-sm cursor-pointer transition-colors ${
-                        t.heroIsDark
-                          ? 'bg-white/15 text-white border border-white/25 hover:bg-white/20'
-                          : t.secondaryBtn
-                      }`}
-                    >
-                      Yedek Parça Mağazası →
-                    </button>
-                  </div>
                 </div>
 
-                {/* Hızlı WhatsApp Destek Kartı */}
-                <div
-                  className={`lg:col-span-4 p-6 rounded-2xl ${
-                    t.heroIsDark ? 'bg-white/10 border border-white/15 text-white' : `${t.subtleBg} border`
-                  } space-y-4`}
-                >
-                  <div className="text-xs font-semibold uppercase tracking-wider opacity-75">
-                    Gebze Teknik Servis & Satış Hattı
-                  </div>
-                  <div className="text-base font-bold">Arıza, Parça veya 2. El Değerleme</div>
-                  <p className="text-xs opacity-80 leading-relaxed">
-                    Cihazınızın fotoğrafını veya yedek parça talebinizi WhatsApp hattımızdan ileterek ustalarımızdan doğrudan bilgi alabilirsiniz.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setWaModalOpen(true)}
-                    className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-colors"
-                  >
-                    <WhatsAppIcon />
-                    <span>WhatsApp Destek Hattı</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* CANLI SERVİS TAKİP SORGULAMA (Alfa Servis Canlı Veritabanı Köprüsü) */}
-            <section id="servis-sorgula" className={`rounded-3xl border p-6 sm:p-8 ${t.surfaceBg} elevated`}>
-              <div>
-                <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
-                  Alfa Servis Takip Sistemi
-                </span>
-                <h2 className={`text-xl sm:text-2xl font-bold ${t.title} mt-0.5`}>
-                  Canlı Servis Durumu Sorgulama
-                </h2>
-                <p className={`text-sm ${t.muted} mt-1`}>
-                  Servise bıraktığınız cihazın kayıtlı cep telefonu numarasını veya servis fiş kodunu girerek güncel aşamayı ve servis fotoğraflarını görüntüleyin.
-                </p>
-              </div>
-
-              <form onSubmit={handleServiceQuery} className="mt-5 flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                  placeholder="Cep Telefonu Numaranız (05XX...) veya Servis Fiş Numarası"
-                  className={`flex-1 px-4 py-3.5 rounded-xl border text-sm tabular focus:outline-none ${t.inputCls}`}
-                />
-                <button
-                  type="submit"
-                  disabled={trackLoading}
-                  className={`px-7 py-3.5 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer disabled:opacity-60 ${t.primaryBtn}`}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                    <circle cx="11" cy="11" r="7" />
-                    <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-                  </svg>
-                  <span>{trackLoading ? 'Sorgulanıyor...' : 'Cihazımı Sorgula'}</span>
-                </button>
-              </form>
-
-              {trackError && (
-                <div className={`mt-5 p-4 rounded-xl border ${t.subtleBg} text-sm text-rose-600 font-medium`}>
-                  {trackError}
-                </div>
-              )}
-
-              {trackSearched && !trackLoading && !trackError && trackRecords.length === 0 && (
-                <div className={`mt-5 p-5 rounded-2xl border ${t.subtleBg} text-sm ${t.body}`}>
-                  Girilen telefon numarası veya servis koduna ait aktif bir servis kaydı bulunamadı. Lütfen kayıt esnasında verdiğiniz telefon numarasını kontrol edin veya{' '}
+                <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                   <a
-                    href={buildWaUrl('Merhaba Alfa Garaj, servisteki cihazımın durumu hakkında bilgi almak istiyorum.')}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`underline font-semibold ${t.title}`}
+                    href="#scooter-vitrini"
+                    className={`px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-colors ${
+                      t.heroIsDark ? 'bg-white text-slate-900 hover:bg-slate-100' : t.primaryBtn
+                    }`}
                   >
-                    WhatsApp hattımızdan
-                  </a>{' '}
-                  destek alın.
+                    2. El & Sıfır Araçlar
+                  </a>
+                  <a
+                    href="#yedek-parca-vitrini"
+                    className={`px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-colors ${
+                      t.heroIsDark
+                        ? 'bg-white/15 text-white border border-white/25 hover:bg-white/20'
+                        : t.secondaryBtn
+                    }`}
+                  >
+                    Yedek Parçalar
+                  </a>
+                  <a
+                    href="#servis-sorgula"
+                    className={`px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-colors ${
+                      t.heroIsDark
+                        ? 'bg-white/15 text-white border border-white/25 hover:bg-white/20'
+                        : t.secondaryBtn
+                    }`}
+                  >
+                    Servis Sorgula ↓
+                  </a>
                 </div>
-              )}
-
-              {trackRecords.length > 0 && (
-                <div className="mt-6 space-y-6">
-                  {trackRecords.map((rec) => {
-                    const pct = Math.round(((rec.stageIndex + 1) / STAGES.length) * 100);
-                    return (
-                      <div key={rec.id} className={`p-6 rounded-2xl border ${t.subtleBg} space-y-5`}>
-                        {/* Kayıt Üst Bilgisi */}
-                        <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b ${t.divider}`}>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 rounded-lg text-xs font-bold tabular ${t.badgePrimary}`}>
-                              #{rec.code}
-                            </span>
-                            <div>
-                              <div className={`font-bold text-base ${t.title}`}>{rec.deviceTitle}</div>
-                              <div className={`text-xs ${t.muted}`}>
-                                {rec.customerName}
-                                {rec.maskedPhone ? ` • ${rec.maskedPhone}` : ''}
-                                {rec.createdAtText ? ` • Kayıt: ${rec.createdAtText}` : ''}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                                rec.stageIndex === 4
-                                  ? 'bg-emerald-500/15 text-emerald-700'
-                                  : rec.needsQuoteApproval
-                                  ? 'bg-rose-500/15 text-rose-700'
-                                  : 'bg-amber-500/15 text-amber-800'
-                              }`}
-                            >
-                              {rec.statusLabel}
-                            </span>
-                            {rec.needsQuoteApproval && (
-                              <a
-                                href={rec.approvalUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
-                              >
-                                Fiyat Teklifini Onayla →
-                              </a>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 5 Adımlı İlerleme Çubuğu */}
-                        <div>
-                          <div className={`h-2 w-full rounded-full ${t.barTrack} overflow-hidden`}>
-                            <div
-                              className={`h-full rounded-full ${t.barFill} transition-all duration-500`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
-                            {STAGES.map((st, idx) => (
-                              <div
-                                key={st}
-                                className={`text-xs ${
-                                  idx <= rec.stageIndex ? `${t.title} font-semibold` : t.muted
-                                }`}
-                              >
-                                <span className="tabular">{idx + 1}.</span> {st}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Cihaz Fotoğrafları ve Servis Detayı */}
-                        <div className="grid md:grid-cols-12 gap-5 pt-1 items-start">
-                          {rec.photos.length > 0 && (
-                            <div className="md:col-span-5">
-                              <div className={`text-xs font-semibold ${t.muted} mb-2`}>
-                                Servis Cihaz Görselleri (Büyütmek için tıklayın)
-                              </div>
-                              <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                                {rec.photos.map((ph, i) => (
-                                  <button
-                                    key={`${ph.url}-${i}`}
-                                    type="button"
-                                    onClick={() =>
-                                      setLightbox({
-                                        src: ph.url,
-                                        title: `${rec.deviceTitle} — ${ph.label}`,
-                                      })
-                                    }
-                                    className="group relative w-28 h-20 rounded-xl overflow-hidden border border-slate-300/70 bg-white shrink-0 cursor-pointer"
-                                  >
-                                    <img
-                                      src={ph.url}
-                                      alt={ph.label}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                    />
-                                    <span className="absolute inset-x-0 bottom-0 bg-slate-900/75 text-white text-[10px] px-1.5 py-0.5 truncate">
-                                      {ph.label}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div
-                            className={`${
-                              rec.photos.length > 0 ? 'md:col-span-7' : 'md:col-span-12'
-                            } p-4 rounded-xl border ${t.surfaceBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}
-                          >
-                            <div className="space-y-1.5 text-sm">
-                              <div>
-                                <span className={`text-xs font-semibold ${t.muted}`}>Arıza / Talep: </span>
-                                <span className={`${t.title} font-medium`}>{rec.issue}</span>
-                              </div>
-                              <div>
-                                <span className={`text-xs font-semibold ${t.muted}`}>Servis Notu: </span>
-                                <span className={t.body}>{rec.techNote}</span>
-                              </div>
-                            </div>
-
-                            {rec.showPrice && typeof rec.totalPrice === 'number' && rec.totalPrice > 0 && (
-                              <div className={`shrink-0 sm:text-right border-t sm:border-t-0 sm:border-l ${t.divider} pt-3 sm:pt-0 sm:pl-4`}>
-                                <span className={`block text-xs ${t.muted}`}>Toplam Tutar</span>
-                                <span className={`text-lg font-bold tabular ${t.title}`}>
-                                  {formatTL(rec.totalPrice)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            {/* Ayrı Mağaza Sayfalarına Hızlı Geçiş Kartları */}
-            <section className="grid md:grid-cols-2 gap-6">
-              <div
-                onClick={() => switchPage('scooters')}
-                className={`cursor-pointer rounded-2xl border p-6 ${t.surfaceBg} card-lift flex items-center justify-between gap-4`}
-              >
-                <div className="space-y-1.5">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
-                    Araç Satış & Ekspertiz
-                  </span>
-                  <h3 className={`text-lg font-bold ${t.title}`}>Sıfır & Garantili 2. El Scooterlar</h3>
-                  <p className={`text-sm ${t.body}`}>
-                    Kapalı kutu sıfır Segway / ONVO modelleri ve Alfa Garaj garantili ikinci el araçlar.
-                  </p>
-                  <span className={`inline-block pt-1 text-sm font-semibold ${t.title}`}>
-                    Araç Vitrinine Git →
-                  </span>
-                </div>
-                {initialCatalog.scooters[0] && (
-                  <img
-                    src={initialCatalog.scooters[0].img}
-                    alt={initialCatalog.scooters[0].name}
-                    className="w-28 h-20 object-cover rounded-xl border border-slate-200 bg-slate-50 shrink-0"
-                  />
-                )}
-              </div>
-
-              <div
-                onClick={() => switchPage('parts')}
-                className={`cursor-pointer rounded-2xl border p-6 ${t.surfaceBg} card-lift flex items-center justify-between gap-4`}
-              >
-                <div className="space-y-1.5">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${t.muted}`}>
-                    Orijinal Bileşen Stoğu
-                  </span>
-                  <h3 className={`text-lg font-bold ${t.title}`}>Segway & ONVO Yedek Parça Mağazası</h3>
-                  <p className={`text-sm ${t.body}`}>
-                    Tubeless lastik, sürücü anakart, BMS batarya ve hidrolik fren grupları.
-                  </p>
-                  <span className={`inline-block pt-1 text-sm font-semibold ${t.title}`}>
-                    Yedek Parçalara Git →
-                  </span>
-                </div>
-                {initialCatalog.parts[0] && (
-                  <img
-                    src={initialCatalog.parts[0].img}
-                    alt={initialCatalog.parts[0].name}
-                    className="w-28 h-20 object-cover rounded-xl border border-slate-200 bg-slate-50 shrink-0"
-                  />
-                )}
               </div>
             </section>
 
-            {/* Uzmanlık Alanlarımız & Gebze Yerel SEO Bilgilendirme Bölümü */}
+            {/* 1. EN ÜSTTE: 2. EL & SIFIR SCOOTER SATIŞ VİTRİNİ */}
+            {ScooterShowcaseSection}
+
+            {/* 2. HEMEN ALTINDA (ÜST AKIŞTA): YEDEK PARÇA SATIŞ VİTRİNİ */}
+            {PartsShowcaseSection}
+
+            {/* 3. ALT BÖLÜMDE: CANLI SERVİS DURUMU SORGULAMA */}
+            {ServiceTrackingSection}
+
+            {/* 4. UZMANLIK ALANLARIMIZ */}
             <section className="grid md:grid-cols-3 gap-6">
               <div className={`rounded-2xl border p-6 ${t.surfaceBg} space-y-2`}>
                 <h3 className={`font-bold text-base ${t.title}`}>Batarya & BMS Laboratuvarı</h3>
@@ -771,284 +1172,22 @@ export default function CustomerSite({
           </main>
         )}
 
-        {/* =============================================================== */}
-        {/* BÖLÜM 2: SIFIR & 2. EL SCOOTER MAĞAZASI (Ayrı Görünüm)          */}
-        {/* =============================================================== */}
+        {/* TEKİL SAYFALAR (Menüden tıklandığında tam odak görünümü) */}
         {page === 'scooters' && (
-          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10 space-y-8">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-              <div>
-                <div className="mb-3">{BrandBadges}</div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${t.title}`}>
-                  Sıfır & Ekspertiz Garantili 2. El Scooterlar
-                </h1>
-                <p className={`text-sm ${t.muted} mt-1`}>
-                  Sıfır kapalı kutu ve Alfa Garaj atölyesinde test edilmiş garantili ikinci el modelleri inceleyin.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg}`}>
-                  {(
-                    [
-                      { v: 'Tümü', l: 'Tüm Araçlar' },
-                      { v: 'Sıfır', l: 'Sıfır Scooter' },
-                      { v: '2. El', l: '2. El Garantili' },
-                    ] as const
-                  ).map((opt) => (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setScooterCond(opt.v)}
-                      className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                        scooterCond === opt.v ? t.pillActive : t.pillIdle
-                      }`}
-                    >
-                      {opt.l}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg}`}>
-                  {(['Tümü', 'Segway', 'ONVO'] as const).map((b) => (
-                    <button
-                      key={b}
-                      type="button"
-                      onClick={() => setScooterBrand(b)}
-                      className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                        scooterBrand === b ? t.pillActive : t.pillIdle
-                      }`}
-                    >
-                      {b === 'Tümü' ? 'Tüm Markalar' : b}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {filteredScooters.length === 0 ? (
-              <div className={`p-8 rounded-2xl border ${t.surfaceBg} text-center text-sm ${t.muted}`}>
-                Seçilen filtreye uygun araç bulunamadı.
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredScooters.map((s) => (
-                  <article
-                    key={s.id}
-                    className={`rounded-2xl border ${t.surfaceBg} overflow-hidden flex flex-col justify-between card-lift`}
-                  >
-                    <div>
-                      <div
-                        onClick={() => setLightbox({ src: s.img, title: s.name })}
-                        className="cursor-pointer relative h-52 bg-slate-100 border-b border-slate-200/60 overflow-hidden"
-                      >
-                        <img src={s.img} alt={s.name} className="w-full h-full object-cover" />
-                        <span
-                          className={`absolute top-3 left-3 px-3 py-1 rounded-lg text-xs font-bold ${
-                            s.cond === 'Sıfır' ? t.badgePrimary : t.badgeUsed
-                          }`}
-                        >
-                          {s.cond === 'Sıfır' ? 'Sıfır Kutu' : '2. El Ekspertizli'}
-                        </span>
-                        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-white/95 text-slate-900 text-xs font-semibold tabular shadow-xs">
-                          Pil: %{s.battery}
-                        </span>
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          {s.brand === 'Segway' || s.brand === 'ONVO' ? (
-                            <img
-                              src={s.brand === 'Segway' ? '/logos/segway.png' : '/logos/onvo.png'}
-                              alt={s.brand}
-                              className={`h-5 w-auto object-contain ${
-                                themeKey === 'c4' && s.brand === 'Segway' ? 'logo-white' : ''
-                              }`}
-                            />
-                          ) : (
-                            <span className={`text-xs font-bold ${t.muted}`}>{s.brand}</span>
-                          )}
-                          <span className={`text-xs font-medium ${t.muted}`}>{s.stockStatus}</span>
-                        </div>
-                        <h2 className={`font-bold text-lg ${t.title} mt-2`}>{s.name}</h2>
-                        <p className={`text-sm ${t.body} mt-1.5 leading-relaxed`}>{s.desc}</p>
-                        <div className="text-xs text-emerald-600 font-medium mt-2">{s.badge}</div>
-                      </div>
-                    </div>
-
-                    <div className={`px-5 py-4 border-t ${t.divider} flex items-center justify-between gap-3`}>
-                      <span className={`font-bold text-xl tabular ${t.title}`}>{s.price}</span>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={buildWaUrl(
-                            `Merhaba Alfa Garaj, "${s.name}" (${s.cond} - ${s.price}) ilanınız hakkında bilgi almak istiyorum.`
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-xl bg-[#25D366]/15 text-emerald-700 hover:bg-[#25D366] hover:text-white text-xs font-semibold transition-colors"
-                        >
-                          WhatsApp Sor
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            addToCart({
-                              id: s.id,
-                              name: s.name,
-                              price: s.price,
-                              img: s.img,
-                              category: `${s.cond} Scooter`,
-                            })
-                          }
-                          className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${t.primaryBtn}`}
-                        >
-                          Sepete Ekle
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {/* 2. El Alım & Takas Değerlendirme Kutusu */}
-            <div className={`rounded-2xl border p-6 ${t.subtleBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
-              <div>
-                <h3 className={`font-bold text-base ${t.title}`}>
-                  Mevcut Elektrikli Scooter&apos;ınızı Satmak veya Takasa Vermek mi İstiyorsunuz?
-                </h3>
-                <p className={`text-sm ${t.body} mt-0.5`}>
-                  Aracınızın fotoğraflarını ve kilometre bilgisini WhatsApp&apos;tan gönderin, Alfa Garaj ekspertiz ekibimiz ön fiyat değerlendirmesini hemen paylaşsın.
-                </p>
-              </div>
-              <a
-                href={buildWaUrl(
-                  'Merhaba Alfa Garaj, ikinci el elektrikli scooterımı satmak / takas değerlendirmesi yaptırmak istiyorum.'
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-5 py-3 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold text-sm inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-              >
-                <WhatsAppIcon />
-                <span>2. El Değerleme Gönder</span>
-              </a>
-            </div>
+          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
+            {ScooterShowcaseSection}
           </main>
         )}
 
-        {/* =============================================================== */}
-        {/* BÖLÜM 3: YEDEK PARÇA MAĞAZASI (Ayrı Görünüm)                    */}
-        {/* =============================================================== */}
         {page === 'parts' && (
-          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10 space-y-8">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-              <div>
-                <div className="mb-3">{BrandBadges}</div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${t.title}`}>
-                  Segway & ONVO Yedek Parça Mağazası
-                </h1>
-                <p className={`text-sm ${t.muted} mt-1`}>
-                  Orijinal ve tam uyumlu yedek parçaları kargo ile sipariş verebilir veya Gebze servisimizde montaj yaptırabilirsiniz.
-                </p>
-              </div>
+          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
+            {PartsShowcaseSection}
+          </main>
+        )}
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <input
-                  type="text"
-                  value={partSearch}
-                  onChange={(e) => setPartSearch(e.target.value)}
-                  placeholder="Parça adı veya model ara..."
-                  className={`px-3.5 py-2 rounded-xl border text-xs sm:text-sm focus:outline-none ${t.inputCls}`}
-                />
-                <div className={`inline-flex p-1 rounded-xl border ${t.pillWrapBg} self-start`}>
-                  {(
-                    [
-                      { v: 'Tümü', l: 'Tüm Parçalar' },
-                      { v: 'Segway', l: 'Segway Parçaları' },
-                      { v: 'ONVO', l: 'ONVO Parçaları' },
-                    ] as const
-                  ).map((opt) => (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setPartBrand(opt.v)}
-                      className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                        partBrand === opt.v ? t.pillActive : t.pillIdle
-                      }`}
-                    >
-                      {opt.l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {filteredParts.length === 0 ? (
-              <div className={`p-8 rounded-2xl border ${t.surfaceBg} text-center text-sm ${t.muted}`}>
-                Aradığınız kriterde yedek parça bulunamadı. WhatsApp hattımızdan stok sorabilirsiniz.
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {filteredParts.map((p) => (
-                  <article
-                    key={p.id}
-                    className={`rounded-2xl border ${t.surfaceBg} overflow-hidden flex flex-col justify-between card-lift`}
-                  >
-                    <div>
-                      <div
-                        onClick={() => setLightbox({ src: p.img, title: p.name })}
-                        className="cursor-pointer h-44 bg-slate-100 border-b border-slate-200/60 overflow-hidden relative"
-                      >
-                        <img src={p.img} alt={p.name} className="w-full h-full object-cover" />
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/95 text-slate-700 font-mono text-[11px] font-semibold">
-                          {p.code}
-                        </span>
-                      </div>
-                      <div className="p-4">
-                        {p.brand === 'Segway' || p.brand === 'ONVO' ? (
-                          <img
-                            src={p.brand === 'Segway' ? '/logos/segway.png' : '/logos/onvo.png'}
-                            alt={p.brand}
-                            className={`h-4 w-auto object-contain mb-2 ${
-                              themeKey === 'c4' && p.brand === 'Segway' ? 'logo-white' : ''
-                            }`}
-                          />
-                        ) : (
-                          <span className={`text-xs font-bold block mb-1 ${t.muted}`}>{p.brand}</span>
-                        )}
-                        <h2 className={`font-semibold text-sm ${t.title} leading-snug`}>{p.name}</h2>
-                        <p className={`text-xs ${t.muted} mt-1.5`}>Uyumlu: {p.compat}</p>
-                        <div
-                          className={`text-xs font-medium mt-1 tabular ${
-                            p.stock > 0 ? 'text-emerald-600' : 'text-rose-500'
-                          }`}
-                        >
-                          {p.stock > 0 ? `Stokta (${p.stock} adet)` : 'Stok Sorunuz'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`px-4 py-3.5 border-t ${t.divider} flex items-center justify-between`}>
-                      <span className={`font-bold text-base tabular ${t.title}`}>{p.price}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addToCart({
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            img: p.img,
-                            category: 'Yedek Parça',
-                          })
-                        }
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer ${t.primaryBtn}`}
-                      >
-                        Sepete Ekle
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+        {page === 'service' && (
+          <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
+            {ServiceTrackingSection}
           </main>
         )}
       </div>
@@ -1236,7 +1375,9 @@ export default function CustomerSite({
                 Konu seçerek doğrudan WhatsApp hattımıza bağlanabilirsiniz:
               </p>
               <a
-                href={buildWaUrl('Merhaba Alfa Garaj, Segway / ONVO cihazım için teknik servis bilgisi almak istiyorum.')}
+                href={buildWaUrl(
+                  'Merhaba Alfa Garaj, Segway / ONVO cihazım için teknik servis bilgisi almak istiyorum.'
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setWaModalOpen(false)}
@@ -1245,7 +1386,9 @@ export default function CustomerSite({
                 Teknik Servis & Arıza Danışma
               </a>
               <a
-                href={buildWaUrl('Merhaba Alfa Garaj, Segway / ONVO yedek parça uyumluluk ve fiyat bilgisi sormak istiyorum.')}
+                href={buildWaUrl(
+                  'Merhaba Alfa Garaj, Segway / ONVO yedek parça uyumluluk ve fiyat bilgisi sormak istiyorum.'
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setWaModalOpen(false)}
@@ -1254,7 +1397,9 @@ export default function CustomerSite({
                 Yedek Parça Sipariş & Uyumluluk
               </a>
               <a
-                href={buildWaUrl('Merhaba Alfa Garaj, ikinci el scooter satışı / takas değerlendirmesi için bilgi almak istiyorum.')}
+                href={buildWaUrl(
+                  'Merhaba Alfa Garaj, ikinci el scooter satışı / takas değerlendirmesi için bilgi almak istiyorum.'
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setWaModalOpen(false)}
@@ -1267,33 +1412,100 @@ export default function CustomerSite({
         </div>
       )}
 
-      {/* BÜYÜK GÖRSEL LIGHTBOX */}
+      {/* ÇOKLU FOTOĞRAF GALERİ LIGHTBOX MODALI */}
       {lightbox && (
         <div
           onClick={() => setLightbox(null)}
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl"
+            className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl"
           >
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <span className="font-semibold text-sm text-slate-900 truncate pr-3">{lightbox.title}</span>
-              <button
-                type="button"
-                onClick={() => setLightbox(null)}
-                className="text-xs font-semibold text-slate-500 hover:text-slate-900 px-2 py-1 shrink-0 cursor-pointer"
-              >
-                Kapat ✕
-              </button>
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-slate-900 truncate">{lightbox.title}</div>
+                {lightbox.images[lightbox.index]?.label && (
+                  <div className="text-xs text-slate-500">
+                    {lightbox.images[lightbox.index].label}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {lightbox.images.length > 1 && (
+                  <span className="text-xs font-semibold text-slate-500 tabular">
+                    {lightbox.index + 1} / {lightbox.images.length}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLightbox(null)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-900 px-2 py-1 cursor-pointer"
+                >
+                  Kapat ✕
+                </button>
+              </div>
             </div>
-            <div className="p-6 bg-slate-50 flex items-center justify-center">
+
+            <div className="relative p-4 sm:p-6 bg-slate-50 flex items-center justify-center min-h-[320px]">
               <img
-                src={lightbox.src}
+                src={lightbox.images[lightbox.index]?.src}
                 alt={lightbox.title}
-                className="max-h-[70vh] w-auto object-contain rounded-xl"
+                className="max-h-[65vh] w-auto object-contain rounded-xl"
               />
+              {lightbox.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index - 1 + prev.images.length) % prev.images.length,
+                            }
+                          : null
+                      )
+                    }
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/75 hover:bg-slate-900 text-white text-xl font-bold flex items-center justify-center cursor-pointer"
+                    aria-label="Önceki görsel"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox((prev) =>
+                        prev ? { ...prev, index: (prev.index + 1) % prev.images.length } : null
+                      )
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/75 hover:bg-slate-900 text-white text-xl font-bold flex items-center justify-center cursor-pointer"
+                    aria-label="Sonraki görsel"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
             </div>
+
+            {lightbox.images.length > 1 && (
+              <div className="px-5 py-3 border-t border-slate-100 bg-white flex items-center justify-center gap-2 overflow-x-auto">
+                {lightbox.images.map((im, i) => (
+                  <button
+                    key={`${im.src}-${i}`}
+                    type="button"
+                    onClick={() => setLightbox((prev) => (prev ? { ...prev, index: i } : null))}
+                    className={`w-14 h-11 rounded-lg overflow-hidden border-2 shrink-0 cursor-pointer transition-all ${
+                      i === lightbox.index
+                        ? 'border-slate-900 opacity-100'
+                        : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={im.src} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
